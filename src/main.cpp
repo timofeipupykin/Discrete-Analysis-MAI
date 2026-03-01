@@ -7,24 +7,51 @@ struct Pair {
     std::string value;
     std::string clear_key;
 
+    Pair() = default;
+
+    Pair(std::string str) {
+        size_t delimiterPos = str.find('\t');
+
+        if (delimiterPos == std::string::npos) {
+            throw std::invalid_argument("Invalid input format. Expected 'key\tvalue'");
+        }
+
+        key = str.substr(0, delimiterPos);
+
+        for (int i = 0; i < key.size(); i++) {
+            if (key[i] < '0' || key[i] > '9') {
+                continue;
+            }
+            clear_key += key[i];
+        }
+        
+        size_t valueStart = str.find_first_not_of('\t', delimiterPos);
+        if (valueStart != std::string::npos) {
+            value = str.substr(valueStart);
+        }
+    }
+
     friend std::ostream& operator<<(std::ostream& os, const Pair& pair) {
-        os << pair.clear_key << "|" << pair.key << "\t" << pair.value;
+        os << pair.key << "\t" << pair.value;
         return os;
     }
 };
 
 
-std::vector<Pair> CountingSort(std::vector<Pair> pairs, int dig) {
+std::vector<Pair> CountingSort(const std::vector<Pair>& pairs, int dig, int max_size) {
     std::vector<int> extra(10, 0);
+    std::vector<Pair> output(pairs.size());
+
+    auto getDigit = [&](const std::string& key) {
+            int shift = max_size - key.size();
+            if (dig < shift) {
+                return 0;
+            }
+            return key[dig - shift] - '0';
+    };
+
     for (int i = 0; i < pairs.size(); i++) {
-        std::string& cur_key = pairs[i].clear_key;
-        
-        if (dig >= cur_key.size()) {
-            cur_key.insert(0, dig - cur_key.size() + 1, '0');
-        }
-        
-        char ch = cur_key[dig];
-        int index = (ch - '0');
+        int index = getDigit(pairs[i].clear_key);
         extra[index]++;
     }
 
@@ -32,15 +59,8 @@ std::vector<Pair> CountingSort(std::vector<Pair> pairs, int dig) {
         extra[i] += extra[i - 1];
     }
     
-    std::vector<Pair> output(pairs.size());
     for (int i = pairs.size() - 1; i >= 0; i--) {
-        std::string& cur_key = pairs[i].clear_key;
-        if (dig >= cur_key.size()) {
-            cur_key.insert(0, dig - cur_key.size() + 1, '0');
-        }
-        
-        char ch = cur_key[dig];
-        int index = (ch - '0');
+        int index = getDigit(pairs[i].clear_key);
         extra[index]--;
         output[extra[index]] = pairs[i];
     }
@@ -48,8 +68,9 @@ std::vector<Pair> CountingSort(std::vector<Pair> pairs, int dig) {
 }
 
 
-std::vector<Pair> RadixSort(const std::vector<Pair> pairs) {
+std::vector<Pair> RadixSort(const std::vector<Pair>& pairs) {
     std::vector<Pair> output = pairs;
+
     int max_size = 0;
     for (int i = 0; i < output.size(); i++) {
         int cur_size = output[i].clear_key.size();
@@ -59,7 +80,7 @@ std::vector<Pair> RadixSort(const std::vector<Pair> pairs) {
     }
 
     for (int dig = max_size - 1; dig >= 0; dig--) {
-        output = CountingSort(output, dig);
+        output = CountingSort(output, dig, max_size);
     }
 
     return output;
@@ -69,31 +90,13 @@ std::vector<Pair> RadixSort(const std::vector<Pair> pairs) {
 int main() {
     std::vector<Pair> pairs;
     std::string input;
-    std::cout << "Enter a key-value pair (key value):\n";
+    std::cout << "Enter a key-value pairs (key value):\n";
 
     while (std::getline(std::cin, input)) {
         if (input.empty()) continue;
 
-        size_t delimiterPos = input.find('\t');
-        if (delimiterPos != std::string::npos) {
-            Pair pair;
-            pair.key = input.substr(0, delimiterPos);
-
-            for (int i = 0; i < pair.key.size(); i++) {
-                if (pair.key[i] < '0' || pair.key[i] > '9') {
-                    continue;
-                }
-                pair.clear_key += pair.key[i];
-            }
-            
-            size_t valueStart = input.find_first_not_of(' ', delimiterPos);
-            if (valueStart != std::string::npos) {
-                pair.value = input.substr(valueStart);
-                pairs.push_back(pair);
-            }
-        } else {
-            std::cout << "Invalid input. Please enter in the format key value." << std::endl;
-        }
+        Pair pair = Pair(input);
+        pairs.push_back(pair);
     }
 
     pairs = RadixSort(pairs);
