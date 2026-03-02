@@ -1,4 +1,7 @@
 build:
-	g++ -o main src/main.cpp
+	cmake -B build
+	cmake --build build
 run: build
-	./main
+	./build/lab1/lab1
+clean:
+	rm -rf build
