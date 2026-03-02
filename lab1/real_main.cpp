@@ -15,7 +15,7 @@ class Vector {
         void reallocate(size_t new_capacity) {
             T* new_data = new T[new_capacity];
             for (size_t i = 0; i < this->size; i++) {
-                new_data[i] = this->data[i];
+                new_data[i] = std::move(this->data[i]);
             }
             delete[] this->data;
             this->data = new_data;
@@ -104,7 +104,7 @@ class Vector {
             return this->size;
         }
 
-        void PushBack(T value) {
+        void PushBack(T&& value) {
             if (this->size == this->capacity) {
                 size_t new_capacity;
                 if (this->capacity == 0) {
@@ -114,18 +114,8 @@ class Vector {
                 }
                 reallocate(new_capacity);
             }
-            this->data[this->size] = value;
+            this->data[this->size] = std::move(value);
             this->size++;
-        }
-
-        void Pop(int idx = 0) {
-            if (idx < 0 || idx >= this->size) {
-                throw std::out_of_range("Index out of range");
-            }
-            for (size_t i = idx; i < this->size - 1; i++) {
-                this->data[i] = this->data[i + 1];
-            }
-            this->size--;
         }
 
         friend std::ostream& operator<<(std::ostream& os, const Vector<T>& vector) {
@@ -151,89 +141,80 @@ class Vector {
 };
 
 struct Pair {
-    std::string key;
-    std::string value;
+    std::string raw_str;
     uint64_t numeric_key;
 
     Pair() = default;
 
-    explicit Pair(const std::string& str) : numeric_key(0) {
-        size_t delimiterPos = str.find('\t');
-
-        if (delimiterPos == std::string::npos) {
-            throw std::invalid_argument("Invalid input format. Expected 'key\tvalue'");
-        }
-
-        key = str.substr(0, delimiterPos);
-
-        for (char c : key) {
+    explicit Pair(const std::string& str) : raw_str(str), numeric_key(0) {
+        for (char c : raw_str) {
+            if (c == '\t') {
+                break;
+            }
             if (c >= '0'&& c <= '9') {
                 numeric_key = numeric_key * 10 + (c - '0');
             }
-        }
-
-        size_t valueStart = str.find_first_not_of('\t', delimiterPos);
-        if (valueStart != std::string::npos) {
-            value = str.substr(valueStart);
         }
     }
 
     ~Pair() = default;
 
     friend std::ostream& operator<<(std::ostream& os, const Pair& pair) {
-        os << pair.key << "\t" << pair.value;
+        os << pair.raw_str;
         return os;
     }
 };
 
-Vector<Pair> CountingSort(const Vector<Pair>& pairs, int dig) {
+void CountingSortStep(Vector<Pair>& input, Vector<Pair>& output, int shift) {
     Vector<int> extra(256, 0);
-    Vector<Pair> output(pairs.Size());
 
-    for (int i = 0; i < pairs.Size(); i++) {
-        uint8_t index = (pairs[i].numeric_key >> dig) & 0xFF;
+    for (size_t i = 0; i < input.Size(); i++) {
+        uint8_t index = (input[i].numeric_key >> shift) & 0xFF;
         extra[index]++;
     }
 
-    for (int i = 1; i < extra.Size(); i++) {
+    for (size_t i = 1; i < extra.Size(); i++) {
         extra[i] += extra[i - 1];
     }
     
-    for (int i = pairs.Size() - 1; i >= 0; i--) {
-        uint8_t index = (pairs[i].numeric_key >> dig) & 0xFF;
+    for (int i = (int)input.Size() - 1; i >= 0; i--) {
+        uint8_t index = (input[i].numeric_key >> shift) & 0xFF;
         extra[index]--;
-        output[extra[index]] = pairs[i];
+        output[extra[index]] = std::move(input[i]);
     }
-    return output;
 }
 
+void RadixSort(Vector<Pair>& pairs) {
+    if (pairs.Size() < 2) return;
 
-Vector<Pair> RadixSort(const Vector<Pair>& pairs) {
-    Vector<Pair> output = pairs;
+    Vector<Pair> buffer(pairs.Size());
 
-    for (int dig = 0; dig < 8; dig++) {
-        output = CountingSort(output, dig * 8);
+    Vector<Pair>* src = &pairs;
+    Vector<Pair>* dest = &buffer;
+
+    for (int byte = 0; byte < 8; byte++) {
+        CountingSortStep(*src, *dest, byte * 8);
+
+        std::swap(src, dest);
     }
 
-    return output;
+    if (src != &pairs) {
+        pairs = std::move(*src);
+    }
 }
 
 
 int main() {
     Vector<Pair> pairs;
     std::string input;
-    //std::cout << "Enter a key-value pairs (key value):\n";
 
     while (std::getline(std::cin, input)) {
         if (input.empty()) continue;
 
-        Pair pair = Pair(input);
-        pairs.PushBack(pair);
+        pairs.PushBack(Pair(input));
     }
 
-    pairs = RadixSort(pairs);
-
-    //std::cout << "Sorted key-value pairs:\n";
+    RadixSort(pairs);
     
     std::cout << pairs;
 }
