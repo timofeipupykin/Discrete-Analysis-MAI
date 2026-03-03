@@ -13,12 +13,12 @@ class Vector {
         size_t capacity;
 
         void reallocate(size_t new_capacity) {
-            T* new_data = new T[new_capacity];
+            T* newData = new T[new_capacity];
             for (size_t i = 0; i < this->size; i++) {
-                new_data[i] = std::move(this->data[i]);
+                newData[i] = std::move(this->data[i]);
             }
             delete[] this->data;
-            this->data = new_data;
+            this->data = newData;
             this->capacity = new_capacity;
         }
     
@@ -50,18 +50,18 @@ class Vector {
             if (this == &other)
                 return *this;
 
-            T* new_data = nullptr;
+            T* newData = nullptr;
 
             if (other.capacity > 0) {
-                new_data = new T[other.capacity];
+                newData = new T[other.capacity];
                 for (size_t i = 0; i < other.size; ++i) {
-                    new_data[i] = other.data[i];
+                    newData[i] = other.data[i];
                 }
             }
 
             delete[] data;
 
-            data = new_data;
+            data = newData;
             size = other.size;
             capacity = other.capacity;
 
@@ -106,13 +106,13 @@ class Vector {
 
         void PushBack(T&& value) {
             if (this->size == this->capacity) {
-                size_t new_capacity;
+                size_t newCapacity;
                 if (this->capacity == 0) {
-                    new_capacity = 1;
+                    newCapacity = 1;
                 } else {
-                    new_capacity = this->capacity * 2;
+                    newCapacity = this->capacity * 2;
                 }
-                reallocate(new_capacity);
+                reallocate(newCapacity);
             }
             this->data[this->size] = std::move(value);
             this->size++;
@@ -142,42 +142,42 @@ class Vector {
 
 
 struct Pair {
-    std::string raw_str;
-    uint64_t numeric_key;
+    std::string rawStr;
+    uint64_t numericKey;
 
     Pair() = default;
 
-    explicit Pair(const std::string& str) : raw_str(str), numeric_key(0) {
-        for (char c : raw_str) {
+    explicit Pair(const std::string& str) : rawStr(str), numericKey(0) {
+        for (char c : this->rawStr) {
             if (c == '\t') {
                 break;
             }
             if (c >= '0'&& c <= '9') {
-                numeric_key = numeric_key * 10 + (c - '0');
+                this->numericKey = this->numericKey * 10 + (c - '0');
             }
         }
     }
 
     Pair(const Pair& other)
-        : raw_str(other.raw_str),
-          numeric_key(other.numeric_key) {}
+        : rawStr(other.rawStr),
+          numericKey(other.numericKey) {}
 
     Pair& operator=(const Pair& other) {
         if (this != &other) {
-            raw_str = other.raw_str;
-            numeric_key = other.numeric_key;
+            this->rawStr = other.rawStr;
+            this->numericKey = other.numericKey;
         }
         return *this;
     }
 
     Pair(Pair&& other) noexcept
-        : raw_str(std::move(other.raw_str)),
-          numeric_key(other.numeric_key) {}
+        : rawStr(std::move(other.rawStr)),
+          numericKey(other.numericKey) {}
 
     Pair& operator=(Pair&& other) noexcept {
         if (this != &other) {
-            raw_str = std::move(other.raw_str);
-            numeric_key = other.numeric_key;
+            rawStr = std::move(other.rawStr);
+            numericKey = other.numericKey;
         }
         return *this;
     }
@@ -185,7 +185,7 @@ struct Pair {
     ~Pair() = default;
 
     friend std::ostream& operator<<(std::ostream& os, const Pair& pair) {
-        os << pair.raw_str;
+        os << pair.rawStr;
         return os;
     }
 };
@@ -195,7 +195,7 @@ void CountingSortStep(Vector<Pair>& input, Vector<Pair>& output, int shift) {
     Vector<int> extra(256, 0);
 
     for (size_t i = 0; i < input.Size(); i++) {
-        uint8_t index = (input[i].numeric_key >> shift) & 0xFF;
+        uint8_t index = (input[i].numericKey >> shift) & 0xFF;
         extra[index]++;
     }
 
@@ -204,7 +204,7 @@ void CountingSortStep(Vector<Pair>& input, Vector<Pair>& output, int shift) {
     }
     
     for (int i = (int)input.Size() - 1; i >= 0; i--) {
-        uint8_t index = (input[i].numeric_key >> shift) & 0xFF;
+        uint8_t index = (input[i].numericKey >> shift) & 0xFF;
         extra[index]--;
         output[extra[index]] = std::move(input[i]);
     }
