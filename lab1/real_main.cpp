@@ -140,6 +140,7 @@ class Vector {
         }
 };
 
+
 struct Pair {
     std::string raw_str;
     uint64_t numeric_key;
@@ -157,6 +158,30 @@ struct Pair {
         }
     }
 
+    Pair(const Pair& other)
+        : raw_str(other.raw_str),
+          numeric_key(other.numeric_key) {}
+
+    Pair& operator=(const Pair& other) {
+        if (this != &other) {
+            raw_str = other.raw_str;
+            numeric_key = other.numeric_key;
+        }
+        return *this;
+    }
+
+    Pair(Pair&& other) noexcept
+        : raw_str(std::move(other.raw_str)),
+          numeric_key(other.numeric_key) {}
+
+    Pair& operator=(Pair&& other) noexcept {
+        if (this != &other) {
+            raw_str = std::move(other.raw_str);
+            numeric_key = other.numeric_key;
+        }
+        return *this;
+    }
+
     ~Pair() = default;
 
     friend std::ostream& operator<<(std::ostream& os, const Pair& pair) {
@@ -164,6 +189,7 @@ struct Pair {
         return os;
     }
 };
+
 
 void CountingSortStep(Vector<Pair>& input, Vector<Pair>& output, int shift) {
     Vector<int> extra(256, 0);
@@ -183,6 +209,7 @@ void CountingSortStep(Vector<Pair>& input, Vector<Pair>& output, int shift) {
         output[extra[index]] = std::move(input[i]);
     }
 }
+
 
 void RadixSort(Vector<Pair>& pairs) {
     if (pairs.Size() < 2) return;
