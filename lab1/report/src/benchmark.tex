@@ -1,0 +1,24 @@
+\section{Тест производительности}
+
+Тест производительности представляет из себя следующее: создаётся 2 одинаковых массива, один сортируется с помощью алгоритма, который мы реализовали, а другой - с помощью стандартной функции \texttt{std::stable\_sort}. Время выполнения обоих алгоритмов замеряется и сравнивается.
+
+\begin{alltt}
+root@74b1f15b9ece:/workspaces/Discrete-Analysis-MAI# cmake -B build
+root@74b1f15b9ece:/workspaces/Discrete-Analysis-MAI# cmake --build build
+root@74b1f15b9ece:/workspaces/Discrete-Analysis-MAI# python3 lab1/benchmark/generator.py 200
+root@74b1f15b9ece:/workspaces/Discrete-Analysis-MAI# ./build/lab1/lab1 < tests.txt
+Radix sort time: 178us
+STL stable sort time: 153us
+root@74b1f15b9ece:/workspaces/Discrete-Analysis-MAI# python3 lab1/benchmark/generator.py 500
+root@74b1f15b9ece:/workspaces/Discrete-Analysis-MAI# ./build/lab1/lab1 < tests.txt
+Radix sort time: 390us
+STL stable sort time: 469us
+root@74b1f15b9ece:/workspaces/Discrete-Analysis-MAI# python3 lab1/benchmark/generator.py 1000
+root@74b1f15b9ece:/workspaces/Discrete-Analysis-MAI# ./build/lab1/lab1 < tests.txt
+Radix sort time: 776us
+STL stable sort time: 1043us
+\end{alltt}
+
+Как видно, что на небольшом количестве элементов на скорость алгоритма больше влияет конкретная оптимизация алгоритма, то есть \texttt{std::stable\_sort} обычно работает быстрее, так как это stl сортировка и он оптимизирован для работы с различными типами данных и может использовать более эффективные алгоритмы сортировки в зависимости от входных данных. Однако, при увеличении количества элементов, алгоритм сортировки становится более важным фактором, и наш алгоритм начинает работать быстрее, чем \texttt{std::stable\_sort}, что связано с тем, что асимптотическая сложность нашего алгоритма меньше, чем у \texttt{std::stable\_sort} O(n * k) < O (n * log(n)).
+
+\pagebreak

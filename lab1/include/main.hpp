@@ -1,8 +1,11 @@
+#pragma once
+
 #include <iostream>
 #include <stdexcept>
 #include <string>
 #include <cstddef>
 #include <cstdint>
+#include <cmath>
 
 
 template <typename T>
@@ -13,12 +16,12 @@ class Vector {
         size_t capacity;
 
         void reallocate(size_t new_capacity) {
-            T* newData = new T[new_capacity];
+            T* new_data = new T[new_capacity];
             for (size_t i = 0; i < this->size; i++) {
-                newData[i] = std::move(this->data[i]);
+                new_data[i] = std::move(this->data[i]);
             }
             delete[] this->data;
-            this->data = newData;
+            this->data = new_data;
             this->capacity = new_capacity;
         }
     
@@ -50,18 +53,18 @@ class Vector {
             if (this == &other)
                 return *this;
 
-            T* newData = nullptr;
+            T* new_data = nullptr;
 
             if (other.capacity > 0) {
-                newData = new T[other.capacity];
+                new_data = new T[other.capacity];
                 for (size_t i = 0; i < other.size; ++i) {
-                    newData[i] = other.data[i];
+                    new_data[i] = other.data[i];
                 }
             }
 
             delete[] data;
 
-            data = newData;
+            data = new_data;
             size = other.size;
             capacity = other.capacity;
 
@@ -70,8 +73,8 @@ class Vector {
 
         Vector(Vector&& other) noexcept
             : data(other.data),
-            size(other.size),
-            capacity(other.capacity)
+              size(other.size),
+              capacity(other.capacity)
         {
             other.data = nullptr;
             other.size = 0;
@@ -106,13 +109,13 @@ class Vector {
 
         void PushBack(T&& value) {
             if (this->size == this->capacity) {
-                size_t newCapacity;
+                size_t new_capacity;
                 if (this->capacity == 0) {
-                    newCapacity = 1;
+                    new_capacity = 1;
                 } else {
-                    newCapacity = this->capacity * 2;
+                    new_capacity = this->capacity * 2;
                 }
-                reallocate(newCapacity);
+                reallocate(new_capacity);
             }
             this->data[this->size] = std::move(value);
             this->size++;
@@ -140,108 +143,57 @@ class Vector {
         }
 };
 
-
 struct Pair {
-    std::string rawStr;
-    uint64_t numericKey;
+    public:
+        std::string raw_str;
+        uint64_t numeric_key;
 
-    Pair() = default;
+        Pair() = default;
 
-    explicit Pair(const std::string& str) : rawStr(str), numericKey(0) {
-        for (char c : this->rawStr) {
-            if (c == '\t') {
-                break;
+        explicit Pair(const std::string& str) : raw_str(str), numeric_key(0) {
+            for (char c : raw_str) {
+                if (c == '\t') {
+                    break;
+                }
+                if (c >= '0'&& c <= '9') {
+                    numeric_key = numeric_key * 10 + (c - '0');
+                }
             }
-            if (c >= '0'&& c <= '9') {
-                this->numericKey = this->numericKey * 10 + (c - '0');
+        }
+
+        Pair(const Pair& other)
+            : raw_str(other.raw_str),
+            numeric_key(other.numeric_key) {}
+
+        Pair& operator=(const Pair& other) {
+            if (this != &other) {
+                raw_str = other.raw_str;
+                numeric_key = other.numeric_key;
             }
+            return *this;
         }
-    }
 
-    Pair(const Pair& other)
-        : rawStr(other.rawStr),
-          numericKey(other.numericKey) {}
+        Pair(Pair&& other) noexcept
+            : raw_str(std::move(other.raw_str)),
+            numeric_key(other.numeric_key) {}
 
-    Pair& operator=(const Pair& other) {
-        if (this != &other) {
-            this->rawStr = other.rawStr;
-            this->numericKey = other.numericKey;
+        Pair& operator=(Pair&& other) noexcept {
+            if (this != &other) {
+                raw_str = std::move(other.raw_str);
+                numeric_key = other.numeric_key;
+            }
+            return *this;
         }
-        return *this;
-    }
 
-    Pair(Pair&& other) noexcept
-        : rawStr(std::move(other.rawStr)),
-          numericKey(other.numericKey) {}
 
-    Pair& operator=(Pair&& other) noexcept {
-        if (this != &other) {
-            rawStr = std::move(other.rawStr);
-            numericKey = other.numericKey;
+        ~Pair() = default;
+
+        friend std::ostream& operator<<(std::ostream& os, const Pair& pair) {
+            os << pair.raw_str;
+            return os;
         }
-        return *this;
-    }
-
-    ~Pair() = default;
-
-    friend std::ostream& operator<<(std::ostream& os, const Pair& pair) {
-        os << pair.rawStr;
-        return os;
-    }
 };
 
+void CountingSortStep(Vector<Pair>& input, Vector<Pair>& output, int shift);
 
-void CountingSortStep(Vector<Pair>& input, Vector<Pair>& output, int shift) {
-    Vector<int> extra(256, 0);
-
-    for (size_t i = 0; i < input.Size(); i++) {
-        uint8_t index = (input[i].numericKey >> shift) & 0xFF;
-        extra[index]++;
-    }
-
-    for (size_t i = 1; i < extra.Size(); i++) {
-        extra[i] += extra[i - 1];
-    }
-    
-    for (int i = (int)input.Size() - 1; i >= 0; i--) {
-        uint8_t index = (input[i].numericKey >> shift) & 0xFF;
-        extra[index]--;
-        output[extra[index]] = std::move(input[i]);
-    }
-}
-
-
-void RadixSort(Vector<Pair>& pairs) {
-    if (pairs.Size() < 2) return;
-
-    Vector<Pair> buffer(pairs.Size());
-
-    Vector<Pair>* src = &pairs;
-    Vector<Pair>* dest = &buffer;
-
-    for (int byte = 0; byte < 8; byte++) {
-        CountingSortStep(*src, *dest, byte * 8);
-
-        std::swap(src, dest);
-    }
-
-    if (src != &pairs) {
-        pairs = std::move(*src);
-    }
-}
-
-
-int main() {
-    Vector<Pair> pairs;
-    std::string input;
-
-    while (std::getline(std::cin, input)) {
-        if (input.empty()) continue;
-
-        pairs.PushBack(Pair(input));
-    }
-
-    RadixSort(pairs);
-    
-    std::cout << pairs;
-}
+void RadixSort(Vector<Pair>& pairs);
