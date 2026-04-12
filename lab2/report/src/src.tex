@@ -1,0 +1,218 @@
+\section{Описание}
+
+Требуется реализовать собственный словарь на базе красно-чёрного дерева. В основе лежат специфические правила раскраски узлов и операции балансировки — левое и правое вращение, а также перекраска, которые гарантируют, что высота дерева не превысит $2 \log (n + 1)$. 
+
+Для этого реализуется класс \texttt{RBTree} и структура \texttt{Node}, включающая в структуру \texttt{Pair}, в которой хранится ключ, значение, указатели на потомков и структура данных \texttt{ParentWithColor}, которая хранит в себе ссылку на предка и цвет узла (RED/BLACK) с помощью техники \textit{Pointer tagging}, позволяя использовать младшие биты для хранения информации.
+
+А после надо провести исследование скорости выполнения и потребления оперативной памяти.
+\pagebreak
+
+\subsection{Color}
+
+Перечисление с жесткой типизацией (\texttt{enum class}), определяющее цвет узла. В качестве базового типа используется \texttt{bool}, что идеально подходит для последующей упаковки в младший бит указателя (0 для RED, 1 для BLACK).
+
+\begin{table}[!ht]
+\centering
+\begin{tabular}{|p{7.5cm}|p{7.5cm}|}
+\hline
+\rowcolor{lightgray}
+\multicolumn{2}{|c|}{Color} \\
+\hline
+\texttt{RED} & Константа, представляющая красный цвет узла \\
+\hline
+\texttt{BLACK} & Константа, представляющая черный цвет узла \\
+\hline
+\texttt{operator<<} & Перегрузка оператора вывода для отладки состояния дерева \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{Pair}
+
+Структура данных, представляющая собой полезную нагрузку узла. Она связывает строковый ключ (телефон или слово) с его соответствующим числовым значением \texttt{uint64\_t}.
+
+\begin{table}[!ht]
+\centering
+\begin{tabular}{|p{7.5cm}|p{7.5cm}|}
+\hline
+\rowcolor{lightgray}
+\multicolumn{2}{|c|}{Pair} \\
+\hline
+\texttt{std::string key} & Ключ словаря для лексикографического сравнения \\
+\hline
+\texttt{uint64\_t value} & Значение, ассоциированное с данным ключом \\
+\hline
+\texttt{Pair(...)} & Конструкторы для инициализации данных \\
+\hline
+\texttt{operator<<} & Форматированный вывод содержимого пары \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{ParentWithColor}
+
+Шаблонный класс, реализующий технику \textit{pointer tagging}. Поскольку адреса объектов в куче выровнены, младшие биты указателя всегда нулевые. Мы используем самый младший бит для хранения цвета, что экономит память и улучшает локальность данных.
+
+\begin{table}[!ht]
+\centering
+\begin{tabular}{|p{7.5cm}|p{7.5cm}|}
+\hline
+\rowcolor{lightgray}
+\multicolumn{2}{|c|}{ParentWithColor<T>} \\
+\hline
+\texttt{uintptr\_t data} & Числовое представление указателя, совмещенное с битом цвета \\
+\hline
+\texttt{struct ColorProxy} & Прокси-объект для удобного чтения и записи цвета через оператор \texttt{=} \\
+\hline
+\texttt{struct ParentProxy} & Прокси-объект для обращения к родителю и его разыменования \\
+\hline
+\texttt{color()} & Доступ к биту цвета узла \\
+\hline
+\texttt{parent()} & Доступ к указателю на родительский узел \\
+\hline
+\texttt{ptr() const} & Извлечение чистого адреса памяти без бита цвета \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{Node}
+
+Базовый узел дерева. Содержит данные, ссылки на детей и упакованный указатель на родителя. Использование \texttt{alignas} гарантирует корректное выравнивание для работы \textit{pointer tagging}.
+
+\begin{table}[!ht]
+\centering
+\begin{tabular}{|p{7.5cm}|p{7.5cm}|}
+\hline
+\rowcolor{lightgray}
+\multicolumn{2}{|c|}{Node} \\
+\hline
+\texttt{Pair data} & Полезная нагрузка узла \\
+\hline
+\texttt{Node* left / Node* right} & Указатели на левое и правое поддеревья \\
+\hline
+\texttt{ParentWithColor<Node> pwc} & Упакованный родитель и цвет узла \\
+\hline
+\texttt{Node(const Pair\&)} & Конструктор инициализации узла данными \\
+\hline
+\texttt{operator<<} & Вывод узла (для отладки: данные + цвет) \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{RBTree}
+
+Класс \texttt{RBTree} реализует самобалансирующееся бинарное дерево поиска. Все основные операции выполняются за $O(\log n)$ благодаря поддержанию свойств красно-чёрного дерева.
+
+Для упрощения логики используется специальный фиктивный узел \texttt{NIL}, представляющий листья дерева. Он всегда окрашен в черный цвет и заменяет \texttt{nullptr}.
+
+\begin{table}[!ht]
+\centering
+\begin{tabular}{|p{7.5cm}|p{7.5cm}|}
+\hline
+\rowcolor{lightgray}
+\multicolumn{2}{|c|}{Поля класса} \\
+\hline
+\texttt{Node* root} & Корень дерева \\
+\hline
+\texttt{Node* NIL} & Фиктивный листовой узел (sentinel) \\
+\hline
+\end{tabular}
+\end{table}
+
+\begin{table}[!ht]
+\centering
+\begin{tabular}{|p{7.5cm}|p{7.5cm}|}
+\hline
+\rowcolor{lightgray}
+\multicolumn{2}{|c|}{Методы модификации и поиска} \\
+\hline
+\texttt{bool insert(const Pair\& data)} & Вставка элемента с последующей балансировкой через \texttt{insertFixUp}. \\
+\hline
+\texttt{bool remove(const std::string\& key)} & Удаление элемента по ключу с возможной балансировкой через \texttt{removeFixUp}. \\
+\hline
+\texttt{Node* search(const std::string\& key)} & Поиск элемента (регистронезависимый). \\
+\hline
+\texttt{Node* search\_impl(const std::string\& key)} & Внутренняя реализация поиска (возвращает \texttt{NIL} при отсутствии). \\
+\hline
+\end{tabular}
+\end{table}
+
+\begin{table}[!ht]
+\centering
+\begin{tabular}{|p{7.5cm}|p{7.5cm}|}
+\hline
+\rowcolor{lightgray}
+\multicolumn{2}{|c|}{Методы балансировки} \\
+\hline
+\texttt{void leftRotate(Node* x)} & Левый поворот вокруг узла \texttt{x}. \\
+\hline
+\texttt{void rightRotate(Node* y)} & Правый поворот вокруг узла \texttt{y}. \\
+\hline
+\texttt{void insertFixUp(Node* z)} & Восстановление свойств дерева после вставки. \\
+\hline
+\texttt{void removeFixUp(Node* x)} & Восстановление свойств дерева после удаления. \\
+\hline
+\end{tabular}
+\end{table}
+
+\begin{table}[!ht]
+\centering
+\begin{tabular}{|p{7.5cm}|p{7.5cm}|}
+\hline
+\rowcolor{lightgray}
+\multicolumn{2}{|c|}{Служебные методы работы с деревом} \\
+\hline
+\texttt{Node* successor(Node* x)} & Поиск следующего по порядку узла. \\
+\hline
+\texttt{Node* minimum(Node* x)} & Поиск минимального элемента в поддереве. \\
+\hline
+\texttt{void clear(Node* node)} & Рекурсивное удаление поддерева. \\
+\hline
+\texttt{void setUpNIL()} & Инициализация фиктивного узла \texttt{NIL}. \\
+\hline
+\texttt{std::string to\_lower(std::string)} & Приведение строки к нижнему регистру. \\
+\hline
+\end{tabular}
+\end{table}
+
+\begin{table}[!ht]
+\centering
+\begin{tabular}{|p{7.5cm}|p{7.5cm}|}
+\hline
+\rowcolor{lightgray}
+\multicolumn{2}{|c|}{Сериализация} \\
+\hline
+\texttt{void save(const std::string\& path)} & Сохранение дерева в бинарный файл. \\
+\hline
+\texttt{void load(const std::string\& path)} & Загрузка дерева из файла. \\
+\hline
+\texttt{void save\_impl(Node*, std::ofstream\&)} & Рекурсивная сериализация (pre-order). \\
+\hline
+\texttt{Node* load\_impl(std::istream\&, Node*)} & Рекурсивная десериализация дерева. \\
+\hline
+\end{tabular}
+\end{table}
+
+\pagebreak
+
+\section{Консоль}
+
+\begin{alltt}
+root@74b1f15b9ece:/workspaces/Discrete-Analysis-MAI# cmake -B build
+root@74b1f15b9ece:/workspaces/Discrete-Analysis-MAI# cmake --build build
+root@74b1f15b9ece:/workspaces/Discrete-Analysis-MAI# ./build/lab2/lab2
+
++ a 1
+OK
++ A 2
+Exist
+A
+OK: 1
+- A
+OK
+a
+NoSuchWord
+
+\end{alltt}
+
+\pagebreak
