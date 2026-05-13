@@ -1,0 +1,253 @@
+\section{Описание}
+
+Требуется реализовать поиск одного или нескольких образцов в тексте с использованием алгоритма \textbf{Кнута-Морриса-Пратта} (КМП) с построением функции переходов через Z-функцию по методу Гусфилда.
+
+Основная идея алгоритма КМП заключается в том, что при каждом несовпадении символа не требуется начинать поиск заново. Вместо этого используется функция неудач $F$, которая позволяет совершать максимально длинные сдвиги паттерна, используя информацию о его строении.
+
+Для эффективной работы с потоками данных большого объёма используется \textbf{потоковая обработка}: текст читается построчно, разбивается на слова, и каждое слово обрабатывается без накопления всех данных в памяти.
+
+Поскольку паттерн состоит из нескольких слов, а вхождение может начинаться с последнего прочитанного слова буфера, применяется \textbf{кольцевой буфер} размером $n$ (количество слов в паттерне) для сохранения метаданных о позициях последних обработанных слов.
+
+Для оптимизации вычисления функции неудач используется алгоритм \textbf{Гусфилда}, который на основе $Z$-функции быстро строит таблицу сдвигов за линейное время $O(n)$.
+
+\pagebreak
+
+\section{Исходный код}
+
+Реализация состоит из нескольких ключевых компонентов, каждый отвечающий за отдельный аспект алгоритма.
+
+\subsection{Структура Pos}
+
+Вспомогательная структура для хранения метаданных о позиции слова в тексте. Содержит:
+\begin{itemize}
+    \item \texttt{size\_t line} — номер строки;
+    \item \texttt{size\_t pos} — номер слова в строке.
+\end{itemize}
+
+\subsection{Класс FArray}
+
+Класс, отвечающий за предварительную обработку паттерна. Реализует построение массива сдвигов "функцию неудач" $F$. Данный подход позволяет за линейное время $O(n)$ вычислить все необходимые переходы для автомата КМП.
+
+Вычисление функции неудач разделяется на 3 основных этапа:
+\begin{enumerate}
+\item Построение Z-блоков (Z-функции): На этом этапе для каждой позиции паттерна вычисляется длина наибольшего общего префикса между всем паттерном и его суффиксом, начинающимся с этой позиции.
+\item Построение функции $sp'$: Данная функция определяет длину максимального строгого префикса паттерна, который одновременно является и его суффиксом для текущей подстроки, при условии, что символы, следующие за этим префиксом и суффиксом, не совпадают.
+\item Построение функции неудач $F$: Финальный этап, на котором на основе полученных значений $sp'$ формируется итоговый массив сдвигов. Функция $F$ указывает, к какому состоянию (или какому символу паттерна) необходимо перейти в случае возникновения несоответствия при поиске.
+\end{enumerate}
+\subsection{Потоковая обработка и поиск}
+
+Основная логика сосредоточена в функции \texttt{main} и локальной лямбда-функции \texttt{process word}.
+
+Программа работает в следующем порядке:
+
+\begin{enumerate}
+    \item \textbf{Чтение и парсинг паттерна:} Первая строка нормализуется (нижний регистр) и разбивается на слова.
+    \item \textbf{Инициализация автомата:} Строится массив $F$ для вычисления переходов.
+    \item \textbf{Процесс поиска:} Каждое слово текста сопоставляется с текущим состоянием автомата.
+    \item \textbf{Обновление состояния:} Переменная $p$ отслеживает количество совпавших слов. При несовпадении используется функция $F$.
+    \item \textbf{Вывод результатов:} При полном совпадении ($p == n + 1$) координаты извлекаются из кольцевого буфера.
+\end{enumerate}
+
+\subsection{Кольцевой буфер}
+
+Кольцевой буфер хранит координаты последних $n$ обработанных слов. Это необходимо для корректного вывода позиции начала найденного паттерна в условиях потокового чтения.
+
+Индекс в кольцевом буфере циклически увеличивается: \texttt{ring\_idx = (ring\_idx + 1) \% n}. Когда найдено совпадение, начало паттерна находится в позиции \texttt{(ring\_idx + 1) \% n}.
+
+\begin{table}[!ht]
+\centering
+\begin{tabular}{|p{7.5cm}|p{7.5cm}|}
+\hline
+\rowcolor{lightgray}
+\multicolumn{2}{|c|}{main.cpp} \\
+\hline
+\texttt{FArray(const std::vector<std::string>\& pattern)} & Конструктор: вычисление Z-функции и построение таблицы $F$ \\
+\hline
+\rowcolor{lightgray}
+\multicolumn{2}{|c|}{main.cpp} \\
+\hline
+\texttt{void process\_word(size\_t l, size\_t w)} & Лямбда-функция обработки одного слова и обновления состояния автомата КМП \\
+\hline
+\rowcolor{lightgray}
+\multicolumn{2}{|c|}{main.cpp} \\
+\hline
+\texttt{std::vector<Pos> ring\_buffer} & Кольцевой буфер для хранения координат последних $n$ слов \\
+\hline
+\end{tabular}
+\end{table}
+
+\pagebreak
+
+\begin{lstlisting}[language=C++]
+#include <iostream>
+#include <string>
+#include <vector>
+#include <cstdint>
+#include <algorithm>
+
+struct Pos {
+    size_t line;
+    size_t pos;
+};
+
+class FArray {
+    std::vector<size_t> F;
+
+public:
+    explicit FArray(const std::vector<std::string>& pattern) {
+        size_t n = pattern.size();
+        if (n == 0) return;
+
+        std::vector<size_t> Z(n, 0);
+        size_t L = 0, R = 0;
+        for (size_t i = 1; i < n; ++i) {
+            if (i <= R) {
+                Z[i] = std::min(R - i + 1, Z[i - L]);
+            }
+            while (i + Z[i] < n && pattern[Z[i]] == pattern[i + Z[i]]) {
+                ++Z[i];
+            }
+            if (i + Z[i] - 1 > R) {
+                L = i;
+                R = i + Z[i] - 1;
+            }
+        }
+        std::vector<size_t> sp_prime(n, 0);
+        for (int64_t j = static_cast<int64_t>(n) - 1; j >= 1; --j) {
+            if (Z[j] > 0) {
+                size_t i = j + Z[j] - 1;
+                sp_prime[i] = Z[j];
+            }
+        }
+        F.resize(n + 2, 0);
+        F[1] = 1;
+        for (size_t i = 2; i <= n + 1; ++i) {
+            F[i] = sp_prime[i - 2] + 1;
+        }
+    }
+
+    inline size_t operator[](size_t p) const {
+        return F[p];
+    }
+};
+
+int main() {
+    std::ios_base::sync_with_stdio(false);
+    std::cin.tie(NULL);
+
+    std::string pattern_line;
+    if (!std::getline(std::cin, pattern_line) || pattern_line.empty()) {
+        return 0;
+    }
+    std::vector<std::string> pattern;
+    std::string temp;
+    for (char ch : pattern_line) {
+        if (std::isspace(ch)) {
+            if (!temp.empty()) {
+                for (char &c : temp) c = std::tolower(c);
+                pattern.push_back(temp);
+                temp.clear();
+            }
+        } else {
+            temp += ch;
+        }
+    }
+    if (!temp.empty()) {
+        for (char &c : temp) c = std::tolower(c);
+        pattern.push_back(temp);
+    }
+    size_t n = pattern.size();
+    if (n == 0) return 0;
+
+    FArray F(pattern);
+
+    std::vector<Pos> ring_buffer(n);
+
+    size_t ring_idx = 0;
+    size_t line_num = 1;
+
+    size_t p = 1;
+
+    std::string current_word;
+    current_word.reserve(20); 
+
+    auto process_word = [&](size_t l, size_t w) {
+        if (current_word.empty()) return;
+
+        for (char &c : current_word) c = std::tolower(c);
+
+        ring_buffer[ring_idx] = {l, w};
+
+        while (true) {
+            if (p <= n && current_word == pattern[p - 1]) {
+                p++;
+                break;
+            }
+            if (p == 1) break;
+            p = F[p];
+        }
+        if (p == n + 1) {
+            size_t match_start_idx = (ring_idx + 1) % n;
+            std::cout << ring_buffer[match_start_idx].line << ", " << ring_buffer[match_start_idx].pos << "\n";
+            p = F[p];
+        }
+        ring_idx = (ring_idx + 1) % n;
+        current_word.clear();
+    };
+
+    std::string line;
+    while (std::getline(std::cin, line)) {
+        size_t word_in_line = 1;
+
+        for (size_t i = 0; i < line.length(); ++i) {
+
+            char ch = line[i];
+
+            if (std::isspace(ch)) {
+                if (!current_word.empty()) {
+                    process_word(line_num, word_in_line);
+                    word_in_line++;
+                }
+            } else {
+                current_word += ch;
+            }
+        }
+        if (!current_word.empty()) {
+            process_word(line_num, word_in_line);
+        }
+        line_num++;
+    }
+    return 0;
+}
+\end{lstlisting}
+
+\pagebreak
+
+\subsection{Анализ сложности}
+
+\begin{itemize}
+    \item \textbf{Временная сложность предварительной обработки:} $O(n)$, где $n$ — количество слов в паттерне.
+    \item \textbf{Временная сложность поиска:} $O(m + n)$, где $m$ — общее количество слов в тексте. Каждое слово текста обрабатывается ровно один раз.
+    \item \textbf{Пространственная сложность:} $O(n)$ для хранения паттерна, функции $F$ и кольцевого буфера.
+\end{itemize}
+
+Благодаря кольцевому буферу размером $n$ и потоковой обработке программа способна работать с текстами произвольного размера, не накапливая их целиком в памяти.
+
+\pagebreak
+
+\section{Консоль}
+
+\begin{alltt}
+root@workspaces:/workspaces/Discrete-Analysis-MAI# cmake -B build
+root@workspaces:/workspaces/Discrete-Analysis-MAI# cmake --build build
+root@workspaces:/workspaces/Discrete-Analysis-MAI# ./build/lab4/lab4
+
+cat dog cat dog bird
+CAT dog CaT Dog Cat DOG bird CAT
+dog cat dog bird
+1, 3
+1, 8
+
+\end{alltt}
+
+\pagebreak
