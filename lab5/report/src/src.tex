@@ -1,0 +1,194 @@
+\section{Описание}
+
+Требуется реализовать поиск поступающих на вход образцов (паттернов) в заранее известном тексте. Для эффективного решения задачи применяется предварительная индексация текста — построение \textbf{суффиксного массива}.
+
+Для построения суффиксного массива напрямую используется алгоритм \textbf{Манбера-Майерса}. Основная идея алгоритма заключается в итеративной сортировке префиксов суффиксов, длины которых являются степенями двойки ($1, 2, 4, 8 \dots$). На каждой итерации длины сравниваемых префиксов удваиваются, что позволяет достичь временной сложности $O(N \log N)$. Для достижения такой оценки на каждом шаге применяется сортировка подсчётом (стабильная сортировка) по классам эквивалентности.
+
+Поиск паттернов в построенном массиве осуществляется с помощью \textbf{бинарного поиска}. Поскольку суффиксный массив содержит лексикографически отсортированные суффиксы текста, все вхождения искомого паттерна будут располагаться в массиве непрерывным блоком. С помощью модифицированных функций верхней и нижней границы (\texttt{lower\_bound} и \texttt{upper\_bound}) алгоритм за логарифмическое время находит границы этого блока.
+
+Для корректной лексикографической сортировки и обработки краевых случаев к исходному тексту добавляется специальный терминальный символ \texttt{\$}, который лексикографически меньше любого другого символа алфавита.
+
+\pagebreak
+
+\section{Исходный код}
+
+Реализация состоит из функции построения суффиксного массива и основного цикла программы, отвечающего за потоковое чтение паттернов и их поиск.
+
+\subsection{Алгоритм Манбера-Майерса}
+
+Функция \texttt{build\_sa} отвечает за построение суффиксного массива.
+\begin{itemize}
+    \item \texttt{p} — массив перестановок (сам суффиксный массив), хранящий индексы начала суффиксов.
+    \item \texttt{c} — массив классов эквивалентности. Если два суффикса совпадают на текущей длине префикса, они имеют одинаковый класс.
+    \item \texttt{cnt} — массив счётчиков для линейной сортировки подсчётом.
+\end{itemize}
+Алгоритм начинает с сортировки циклических сдвигов длины 1, после чего в цикле удваивает длину префикса ($1 \ll h$), пересчитывая классы эквивалентности до тех пор, пока количество уникальных классов не станет равным длине текста.
+
+\subsection{Бинарный поиск паттернов}
+
+Для поиска паттернов в функции \texttt{main} используются лямбда-выражения \texttt{comp\_low} и \texttt{comp\_up}. Они передаются в стандартные алгоритмы \texttt{std::lower\_bound} и \texttt{std::upper\_bound} для бинарного поиска начала и конца отрезка в суффиксном массиве, в котором суффиксы начинаются с искомого паттерна. Метод \texttt{text.compare} позволяет сравнивать только нужный префикс суффикса длиной \texttt{m}.
+
+\begin{table}[!ht]
+\centering
+\begin{tabular}{|p{7.5cm}|p{7.5cm}|}
+\hline
+\rowcolor{lightgray}
+\multicolumn{2}{|c|}{main.cpp} \\
+\hline
+\texttt{void build\_sa(const std::string\& s, std::vector<int>\& p)} & Функция построения суффиксного массива алгоритмом Манбера-Майерса. \\
+\hline
+\rowcolor{lightgray}
+\multicolumn{2}{|c|}{main.cpp} \\
+\hline
+\texttt{comp\_low} / \texttt{comp\_up} & Лямбда-компараторы для нахождения границ диапазона совпадений через бинарный поиск. \\
+\hline
+\rowcolor{lightgray}
+\multicolumn{2}{|c|}{main.cpp} \\
+\hline
+\texttt{std::vector<int> occurrences} & Вектор для хранения позиций найденного паттерна с последующей сортировкой для форматированного вывода. \\
+\hline
+\end{tabular}
+\end{table}
+
+\pagebreak
+
+\begin{lstlisting}[language=C++]
+#include <iostream>
+#include <vector>
+#include <string>
+#include <algorithm>
+
+void build_sa(const std::string& s, std::vector<int>& p) {
+    int n = s.length();
+    const int alphabet = 256;
+    p.assign(n, 0);
+    std::vector<int> c(n, 0), cnt(std::max(alphabet, n), 0);
+
+    for (int i = 0; i < n; i++) cnt[(unsigned char)s[i]]++;
+    for (int i = 1; i < alphabet; i++) cnt[i] += cnt[i - 1];
+    for (int i = 0; i < n; i++) p[--cnt[(unsigned char)s[i]]] = i;
+
+    c[p[0]] = 0;
+    int classes = 1;
+    for (int i = 1; i < n; i++) {
+        if (s[p[i]] != s[p[i - 1]]) classes++;
+        c[p[i]] = classes - 1;
+    }
+
+    std::vector<int> pn(n), cn(n);
+    for (int h = 0; (1 << h) < n; ++h) {
+        for (int i = 0; i < n; i++) {
+            pn[i] = p[i] - (1 << h);
+            if (pn[i] < 0) pn[i] += n;
+        }
+        
+        fill(cnt.begin(), cnt.begin() + classes, 0);
+        for (int i = 0; i < n; i++) cnt[c[pn[i]]]++;
+        for (int i = 1; i < classes; i++) cnt[i] += cnt[i - 1];
+        for (int i = n - 1; i >= 0; i--) p[--cnt[c[pn[i]]]] = pn[i];
+
+        cn[p[0]] = 0;
+        classes = 1;
+
+        for (int i = 1; i < n; i++) {
+            int mid1 = p[i] + (1 << h);
+            if (mid1 >= n) mid1 -= n;
+            
+            int mid2 = p[i - 1] + (1 << h);
+            if (mid2 >= n) mid2 -= n;
+
+            if (c[p[i]] != c[p[i - 1]] || c[mid1] != c[mid2]) {
+                ++classes;
+            }
+            cn[p[i]] = classes - 1;
+        }
+        c = cn;
+
+        if (classes == n) break;
+    }
+}
+
+int main() {
+    std::ios_base::sync_with_stdio(false);
+    std::cin.tie(NULL);
+
+    std::string text;
+    if (!(std::cin >> text)) return 0;
+    
+    text += '$';
+
+    std::vector<int> p;
+    build_sa(text, p);
+
+    std::string pattern;
+    int pattern_idx = 1;
+
+    std::vector<int> occurrences;
+    
+    while (std::cin >> pattern) {
+        int m = pattern.length();
+
+        auto comp_low = [&](int suffix_idx, const std::string& pat) {
+            return text.compare(suffix_idx, m, pat) < 0;
+        };
+
+        auto comp_up = [&](const std::string& pat, int suffix_idx) {
+            return text.compare(suffix_idx, m, pat) > 0;
+        };
+
+        auto it_start = lower_bound(p.begin(), p.end(), pattern, comp_low);
+        auto it_end = upper_bound(it_start, p.end(), pattern, comp_up);
+
+        if (it_start != it_end) {
+            occurrences.clear();
+            
+            for (auto it = it_start; it != it_end; ++it) {
+                occurrences.push_back(*it + 1);
+            }
+            
+            std::sort(occurrences.begin(), occurrences.end());
+
+            std::cout << pattern_idx << ": ";
+            for (size_t i = 0; i < occurrences.size(); ++i) {
+                std::cout << occurrences[i] << (i + 1 == occurrences.size() ? "" : ", ");
+            }
+            std::cout << "\n";
+        }
+        pattern_idx++;
+    }
+
+    return 0;
+}
+\end{lstlisting}
+
+\subsection{Анализ сложности}
+
+Пусть $N$ — длина текста, $M$ — длина текущего искомого паттерна.
+\begin{itemize}
+    \item \textbf{Временная сложность предварительной обработки:} $O(N \log N)$. Алгоритм Манбера-Майерса требует $\log N$ итераций, на каждой из которых выполняется сортировка подсчётом за $O(N)$.
+    \item \textbf{Временная сложность поиска одного паттерна:} $O(M \log N)$. Бинарный поиск требует $O(\log N)$ шагов, на каждом из которых выполняется лексикографическое сравнение строк длины до $M$.
+    \item \textbf{Пространственная сложность:} $O(N)$. Суффиксный массив и вспомогательные структуры для построения (массивы $p, c, cnt, pn, cn$) требуют линейного количества памяти относительно длины текста.
+\end{itemize}
+
+Данный алгоритм является крайне эффективным для задач с однократным чтением объемного текста и последующим множественным поиском образцов, так как основное время тратится на препроцессинг, а после для каждого запроса требуется в разы меньше времени.
+
+\pagebreak
+
+\section{Консоль}
+
+\begin{alltt}
+root@workspaces:/workspaces/Discrete-Analysis-MAI# cmake -B build
+root@workspaces:/workspaces/Discrete-Analysis-MAI# cmake --build build
+root@workspaces:/workspaces/Discrete-Analysis-MAI# ./build/lab5/lab5
+
+abcdabc
+abcd
+bcd
+bc
+1: 1
+2: 2
+3: 2, 6
+
+\end{alltt}
+
+\pagebreak
